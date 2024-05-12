@@ -1,0 +1,177 @@
+From 8717d62785bfcfdff31efd5d132c126cad1261ba Mon Sep 17 00:00:00 2001
+From: Aadil Ahmed <aadilahmed0@gmail.com>
+Date: Sat, 11 May 2024 23:01:04 -0700
+Subject: [PATCH] update app.tsx and graph.tsx
+
+---
+ Pipfile       | 12 ++++++++++++
+ Pipfile.lock  | 37 +++++++++++++++++++++++++++++++++++++
+ src/App.tsx   | 28 ++++++++++++++++++++++------
+ src/Graph.tsx | 15 +++++++++++++--
+ 4 files changed, 84 insertions(+), 8 deletions(-)
+ create mode 100644 Pipfile
+ create mode 100644 Pipfile.lock
+
+diff --git a/Pipfile b/Pipfile
+new file mode 100644
+index 0000000..1f4c547
+--- /dev/null
++++ b/Pipfile
+@@ -0,0 +1,12 @@
++[[source]]
++url = "https://pypi.org/simple"
++verify_ssl = true
++name = "pypi"
++
++[packages]
++python-dateutil = "*"
++
++[dev-packages]
++
++[requires]
++python_version = "3.9"
+diff --git a/Pipfile.lock b/Pipfile.lock
+new file mode 100644
+index 0000000..88e1c88
+--- /dev/null
++++ b/Pipfile.lock
+@@ -0,0 +1,37 @@
++{
++    "_meta": {
++        "hash": {
++            "sha256": "c1f3758d87aad2da0081b86db6da6ce04ad645aadff8bec7a53fdfae6e43d23a"
++        },
++        "pipfile-spec": 6,
++        "requires": {
++            "python_version": "3.9"
++        },
++        "sources": [
++            {
++                "name": "pypi",
++                "url": "https://pypi.org/simple",
++                "verify_ssl": true
++            }
++        ]
++    },
++    "default": {
++        "python-dateutil": {
++            "hashes": [
++                "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3",
++                "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"
++            ],
++            "index": "pypi",
++            "version": "==2.9.0.post0"
++        },
++        "six": {
++            "hashes": [
++                "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926",
++                "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"
++            ],
++            "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'",
++            "version": "==1.16.0"
++        }
++    },
++    "develop": {}
++}
+diff --git a/src/App.tsx b/src/App.tsx
+index 0728518..7352935 100755
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -8,6 +8,7 @@ import './App.css';
+  */
+ interface IState {
+   data: ServerRespond[],
++  showGraph: boolean,
+ }
+ 
+ /**
+@@ -22,6 +23,7 @@ class App extends Component<{}, IState> {
+       // data saves the server responds.
+       // We use this state to parse data down to the child element (Graph) as element property
+       data: [],
++      showGraph: false,
+     };
+   }
+ 
+@@ -29,18 +31,32 @@ class App extends Component<{}, IState> {
+    * Render Graph react component with state.data parse as property data
+    */
+   renderGraph() {
+-    return (<Graph data={this.state.data}/>)
++    if (this.state.showGraph) {
++      return (<Graph data={this.state.data}/>)
++    }
+   }
+ 
+   /**
+    * Get new data from server and update the state with the new data
+    */
+   getDataFromServer() {
+-    DataStreamer.getData((serverResponds: ServerRespond[]) => {
+-      // Update the state by creating a new array of data that consists of
+-      // Previous data in the state and the new data from server
+-      this.setState({ data: [...this.state.data, ...serverResponds] });
+-    });
++    let x = 0;
++    const interval = setInterval( () => {
++      DataStreamer.getData((serverResponds: ServerRespond[]) => {
++        // Update the state by creating a new array of data that consists of
++        // Previous data in the state and the new data from server
++        this.setState({ 
++          data: serverResponds,
++          showGraph: true,
++        });
++      });
++
++      x++;
++      if (x > 1000) {
++        clearInterval(interval);
++      }
++    }, 100);
++    
+   }
+ 
+   /**
+diff --git a/src/Graph.tsx b/src/Graph.tsx
+index 3b2a7da..c6895ba 100644
+--- a/src/Graph.tsx
++++ b/src/Graph.tsx
+@@ -14,7 +14,7 @@ interface IProps {
+  * Perspective library adds load to HTMLElement prototype.
+  * This interface acts as a wrapper for Typescript compiler.
+  */
+-interface PerspectiveViewerElement {
++interface PerspectiveViewerElement extends HTMLElement {
+   load: (table: Table) => void,
+ }
+ 
+@@ -32,7 +32,7 @@ class Graph extends Component<IProps, {}> {
+ 
+   componentDidMount() {
+     // Get element to attach the table from the DOM.
+-    const elem: PerspectiveViewerElement = document.getElementsByTagName('perspective-viewer')[0] as unknown as PerspectiveViewerElement;
++    const elem = document.getElementsByTagName('perspective-viewer')[0] as unknown as PerspectiveViewerElement;
+ 
+     const schema = {
+       stock: 'string',
+@@ -46,6 +46,17 @@ class Graph extends Component<IProps, {}> {
+     }
+     if (this.table) {
+       // Load the `table` in the `<perspective-viewer>` DOM reference.
++      elem.setAttribute('view', 'y_line');
++      elem.setAttribute('column-pivots', '["stock"]');
++      elem.setAttribute('row-pivots', '["timestamp"]');
++      elem.setAttribute('columns', '["top_ask_price"]');
++      elem.setAttribute('aggregates', `
++        {"stock": "distinct count",
++        "top_ask_price": "avg",
++        "top_bid_price": "avg",
++        "timestamp": "distinct count"
++        }`
++      );
+ 
+       // Add more Perspective configurations here.
+       elem.load(this.table);
+-- 
+2.41.0
+
